@@ -1,11 +1,23 @@
 defmodule LetItBidWeb.UserAuth do
+  @moduledoc """
+  Authentication plugs and LiveView `on_mount` hooks.
+
+  Puts the current `LetItBid.Accounts.Scope` in conn and socket assigns as
+  `:current_scope`, and handles log in, log out and remember-me cookies.
+  """
+
   use LetItBidWeb, :verified_routes
 
-  import Plug.Conn
   import Phoenix.Controller
+  import Plug.Conn
+
+  alias Phoenix.LiveView
+  alias Phoenix.LiveView.Socket
+  alias Plug.Conn
 
   alias LetItBid.Accounts
-  alias LetItBid.Accounts.Scope
+  alias LetItBid.Accounts.{Scope, User}
+  alias LetItBidWeb.Endpoint
 
   # Make the remember me cookie valid for 14 days. This should match
   # the session validity setting in UserToken.
@@ -32,6 +44,7 @@ defmodule LetItBidWeb.UserAuth do
   Redirects to the session's `:user_return_to` path
   or falls back to the `signed_in_path/1`.
   """
+  @spec log_in_user(Conn.t(), User.t(), map()) :: Conn.t()
   def log_in_user(conn, user, params \\ %{}) do
     user_return_to = get_session(conn, :user_return_to)
 
@@ -46,12 +59,13 @@ defmodule LetItBidWeb.UserAuth do
 
   It clears all session data for safety. See renew_session.
   """
+  @spec log_out_user(Conn.t()) :: Conn.t()
   def log_out_user(conn) do
     user_token = get_session(conn, :user_token)
-    user_token && Accounts.delete_user_session_token(user_token)
+    if user_token, do: :ok = Accounts.delete_user_session_token(user_token)
 
     if live_socket_id = get_session(conn, :live_socket_id) do
-      LetItBidWeb.Endpoint.broadcast(live_socket_id, "disconnect", %{})
+      :ok = Endpoint.broadcast(live_socket_id, "disconnect", %{})
     end
 
     conn
@@ -65,6 +79,7 @@ defmodule LetItBidWeb.UserAuth do
 
   Will reissue the session token if it is older than the configured age.
   """
+  @spec fetch_current_scope_for_user(Conn.t(), keyword()) :: Conn.t()
   def fetch_current_scope_for_user(conn, _opts) do
     with {token, conn} <- ensure_user_token(conn),
          {user, token_inserted_at} <- Accounts.get_user_by_session_token(token) do
@@ -76,6 +91,108 @@ defmodule LetItBidWeb.UserAuth do
     end
   end
 
+  @doc """
+  Disconnects existing sockets for the given tokens.
+  """
+  @spec disconnect_sessions([%{token: binary()}]) :: :ok
+  def disconnect_sessions(tokens) do
+    Enum.each(tokens, fn %{token: token} ->
+      Endpoint.broadcast(user_session_topic(token), "disconnect", %{})
+    end)
+  end
+
+  @doc """
+  Handles mounting and authenticating the current_scope in LiveViews.
+
+  ## `on_mount` arguments
+
+    * `:mount_current_scope` - Assigns current_scope
+      to socket assigns based on user_token, or nil if
+      there's no user_token or no matching user.
+
+    * `:require_authenticated` - Authenticates the user from the session,
+      and assigns the current_scope to socket assigns based
+      on user_token.
+      Redirects to login page if there's no logged user.
+
+  ## Examples
+
+  Use the `on_mount` lifecycle macro in LiveViews to mount or authenticate
+  the `current_scope`:
+
+      defmodule LetItBidWeb.PageLive do
+        use LetItBidWeb, :live_view
+
+        on_mount {LetItBidWeb.UserAuth, :mount_current_scope}
+        ...
+      end
+
+  Or use the `live_session` of your router to invoke the on_mount callback:
+
+      live_session :authenticated, on_mount: [{LetItBidWeb.UserAuth, :require_authenticated}] do
+        live "/profile", ProfileLive, :index
+      end
+  """
+  @spec on_mount(atom(), map(), map(), Socket.t()) :: {:cont, Socket.t()} | {:halt, Socket.t()}
+  def on_mount(:mount_current_scope, _params, session, socket) do
+    {:cont, mount_current_scope(socket, session)}
+  end
+
+  def on_mount(:require_authenticated, _params, session, socket) do
+    socket = mount_current_scope(socket, session)
+
+    if socket.assigns.current_scope && socket.assigns.current_scope.user do
+      {:cont, socket}
+    else
+      socket =
+        socket
+        |> LiveView.put_flash(:error, "You must log in to access this page.")
+        |> LiveView.redirect(to: ~p"/users/log-in")
+
+      {:halt, socket}
+    end
+  end
+
+  def on_mount(:require_sudo_mode, _params, session, socket) do
+    socket = mount_current_scope(socket, session)
+
+    if Accounts.sudo_mode?(socket.assigns.current_scope.user, -10) do
+      {:cont, socket}
+    else
+      socket =
+        socket
+        |> LiveView.put_flash(:error, "You must re-authenticate to access this page.")
+        |> LiveView.redirect(to: ~p"/users/log-in")
+
+      {:halt, socket}
+    end
+  end
+
+  @doc "Returns the path to redirect to after log in."
+  # the user was already logged in, redirect to settings
+  @spec signed_in_path(Conn.t() | Socket.t()) :: String.t()
+  def signed_in_path(%Conn{assigns: %{current_scope: %Scope{user: %User{}}}}) do
+    ~p"/users/settings"
+  end
+
+  def signed_in_path(_), do: ~p"/"
+
+  @doc """
+  Plug for routes that require the user to be authenticated.
+  """
+  @spec require_authenticated_user(Conn.t(), keyword()) :: Conn.t()
+  def require_authenticated_user(conn, _opts) do
+    if conn.assigns.current_scope && conn.assigns.current_scope.user do
+      conn
+    else
+      conn
+      |> put_flash(:error, "You must log in to access this page.")
+      |> maybe_store_return_to()
+      |> redirect(to: ~p"/users/log-in")
+      |> halt()
+    end
+  end
+
   defp ensure_user_token(conn) do
     if token = get_session(conn, :user_token) do
       {token, conn}
@@ -83,7 +200,12 @@ defmodule LetItBidWeb.UserAuth do
       conn = fetch_cookies(conn, signed: [@remember_me_cookie])
 
       if token = conn.cookies[@remember_me_cookie] do
-        {token, conn |> put_token_in_session(token) |> put_session(:user_remember_me, true)}
+        conn =
+          conn
+          |> put_token_in_session(token)
+          |> put_session(:user_remember_me, true)
+
+        {token, conn}
       else
         nil
       end
@@ -169,82 +291,7 @@ defmodule LetItBidWeb.UserAuth do
     |> put_session(:live_socket_id, user_session_topic(token))
   end
 
-  @doc """
-  Disconnects existing sockets for the given tokens.
-  """
-  def disconnect_sessions(tokens) do
-    Enum.each(tokens, fn %{token: token} ->
-      LetItBidWeb.Endpoint.broadcast(user_session_topic(token), "disconnect", %{})
-    end)
-  end
-
   defp user_session_topic(token), do: "users_sessions:#{Base.url_encode64(token)}"
-
-  @doc """
-  Handles mounting and authenticating the current_scope in LiveViews.
-
-  ## `on_mount` arguments
-
-    * `:mount_current_scope` - Assigns current_scope
-      to socket assigns based on user_token, or nil if
-      there's no user_token or no matching user.
-
-    * `:require_authenticated` - Authenticates the user from the session,
-      and assigns the current_scope to socket assigns based
-      on user_token.
-      Redirects to login page if there's no logged user.
-
-  ## Examples
-
-  Use the `on_mount` lifecycle macro in LiveViews to mount or authenticate
-  the `current_scope`:
-
-      defmodule LetItBidWeb.PageLive do
-        use LetItBidWeb, :live_view
-
-        on_mount {LetItBidWeb.UserAuth, :mount_current_scope}
-        ...
-      end
-
-  Or use the `live_session` of your router to invoke the on_mount callback:
-
-      live_session :authenticated, on_mount: [{LetItBidWeb.UserAuth, :require_authenticated}] do
-        live "/profile", ProfileLive, :index
-      end
-  """
-  def on_mount(:mount_current_scope, _params, session, socket) do
-    {:cont, mount_current_scope(socket, session)}
-  end
-
-  def on_mount(:require_authenticated, _params, session, socket) do
-    socket = mount_current_scope(socket, session)
-
-    if socket.assigns.current_scope && socket.assigns.current_scope.user do
-      {:cont, socket}
-    else
-      socket =
-        socket
-        |> Phoenix.LiveView.put_flash(:error, "You must log in to access this page.")
-        |> Phoenix.LiveView.redirect(to: ~p"/users/log-in")
-
-      {:halt, socket}
-    end
-  end
-
-  def on_mount(:require_sudo_mode, _params, session, socket) do
-    socket = mount_current_scope(socket, session)
-
-    if Accounts.sudo_mode?(socket.assigns.current_scope.user, -10) do
-      {:cont, socket}
-    else
-      socket =
-        socket
-        |> Phoenix.LiveView.put_flash(:error, "You must re-authenticate to access this page.")
-        |> Phoenix.LiveView.redirect(to: ~p"/users/log-in")
-
-      {:halt, socket}
-    end
-  end
 
   defp mount_current_scope(socket, session) do
     Phoenix.Component.assign_new(socket, :current_scope, fn ->
@@ -255,29 +302,6 @@ defmodule LetItBidWeb.UserAuth do
 
       Scope.for_user(user)
     end)
-  end
-
-  @doc "Returns the path to redirect to after log in."
-  # the user was already logged in, redirect to settings
-  def signed_in_path(%Plug.Conn{assigns: %{current_scope: %Scope{user: %Accounts.User{}}}}) do
-    ~p"/users/settings"
-  end
-
-  def signed_in_path(_), do: ~p"/"
-
-  @doc """
-  Plug for routes that require the user to be authenticated.
-  """
-  def require_authenticated_user(conn, _opts) do
-    if conn.assigns.current_scope && conn.assigns.current_scope.user do
-      conn
-    else
-      conn
-      |> put_flash(:error, "You must log in to access this page.")
-      |> maybe_store_return_to()
-      |> redirect(to: ~p"/users/log-in")
-      |> halt()
-    end
   end
 
   defp maybe_store_return_to(%{method: "GET"} = conn) do

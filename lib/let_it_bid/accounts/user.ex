@@ -1,6 +1,24 @@
 defmodule LetItBid.Accounts.User do
+  @moduledoc """
+  A registered user. Users sell auctions and place bids.
+  """
+
   use Ecto.Schema
+
   import Ecto.Changeset
+
+  alias Ecto.Changeset
+
+  @type t :: %__MODULE__{
+          id: integer() | nil,
+          email: String.t() | nil,
+          password: String.t() | nil,
+          hashed_password: String.t() | nil,
+          confirmed_at: DateTime.t() | nil,
+          authenticated_at: DateTime.t() | nil,
+          inserted_at: DateTime.t() | nil,
+          updated_at: DateTime.t() | nil
+        }
 
   schema "users" do
     field :email, :string
@@ -23,10 +41,60 @@ defmodule LetItBid.Accounts.User do
       uniqueness of the email, useful when displaying live validations.
       Defaults to `true`.
   """
+  @spec email_changeset(t() | Changeset.t(), map(), keyword()) :: Changeset.t()
   def email_changeset(user, attrs, opts \\ []) do
     user
     |> cast(attrs, [:email])
     |> validate_email(opts)
+  end
+
+  @doc """
+  A user changeset for changing the password.
+
+  It is important to validate the length of the password, as long passwords may
+  be very expensive to hash for certain algorithms.
+
+  ## Options
+
+    * `:hash_password` - Hashes the password so it can be stored securely
+      in the database and ensures the password field is cleared to prevent
+      leaks in the logs. If password hashing is not needed and clearing the
+      password field is not desired (like when using this changeset for
+      validations on a LiveView form), this option can be set to `false`.
+      Defaults to `true`.
+  """
+  @spec password_changeset(t() | Changeset.t(), map(), keyword()) :: Changeset.t()
+  def password_changeset(user, attrs, opts \\ []) do
+    user
+    |> cast(attrs, [:password])
+    |> validate_confirmation(:password, message: "does not match password")
+    |> validate_password(opts)
+  end
+
+  @doc """
+  Confirms the account by setting `confirmed_at`.
+  """
+  @spec confirm_changeset(t()) :: Changeset.t()
+  def confirm_changeset(user) do
+    now = DateTime.utc_now(:second)
+    change(user, confirmed_at: now)
+  end
+
+  @doc """
+  Verifies the password.
+
+  If there is no user or the user doesn't have a password, we call
+  `Bcrypt.no_user_verify/0` to avoid timing attacks.
+  """
+  @spec valid_password?(t() | nil, String.t() | nil) :: boolean()
+  def valid_password?(%__MODULE__{hashed_password: hashed_password}, password)
+      when is_binary(hashed_password) and byte_size(password) > 0 do
+    Bcrypt.verify_pass(password, hashed_password)
+  end
+
+  def valid_password?(_, _) do
+    Bcrypt.no_user_verify()
+    false
   end
 
   defp validate_email(changeset, opts) do
@@ -56,28 +124,6 @@ defmodule LetItBid.Accounts.User do
     end
   end
 
-  @doc """
-  A user changeset for changing the password.
-
-  It is important to validate the length of the password, as long passwords may
-  be very expensive to hash for certain algorithms.
-
-  ## Options
-
-    * `:hash_password` - Hashes the password so it can be stored securely
-      in the database and ensures the password field is cleared to prevent
-      leaks in the logs. If password hashing is not needed and clearing the
-      password field is not desired (like when using this changeset for
-      validations on a LiveView form), this option can be set to `false`.
-      Defaults to `true`.
-  """
-  def password_changeset(user, attrs, opts \\ []) do
-    user
-    |> cast(attrs, [:password])
-    |> validate_confirmation(:password, message: "does not match password")
-    |> validate_password(opts)
-  end
-
   defp validate_password(changeset, opts) do
     changeset
     |> validate_required([:password])
@@ -104,29 +150,5 @@ defmodule LetItBid.Accounts.User do
     else
       changeset
     end
-  end
-
-  @doc """
-  Confirms the account by setting `confirmed_at`.
-  """
-  def confirm_changeset(user) do
-    now = DateTime.utc_now(:second)
-    change(user, confirmed_at: now)
-  end
-
-  @doc """
-  Verifies the password.
-
-  If there is no user or the user doesn't have a password, we call
-  `Bcrypt.no_user_verify/0` to avoid timing attacks.
-  """
-  def valid_password?(%LetItBid.Accounts.User{hashed_password: hashed_password}, password)
-      when is_binary(hashed_password) and byte_size(password) > 0 do
-    Bcrypt.verify_pass(password, hashed_password)
-  end
-
-  def valid_password?(_, _) do
-    Bcrypt.no_user_verify()
-    false
   end
 end

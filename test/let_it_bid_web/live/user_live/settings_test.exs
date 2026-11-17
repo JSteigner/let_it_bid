@@ -1,9 +1,10 @@
 defmodule LetItBidWeb.UserLive.SettingsTest do
   use LetItBidWeb.ConnCase, async: true
 
-  alias LetItBid.Accounts
-  import Phoenix.LiveViewTest
   import LetItBid.AccountsFixtures
+  import Phoenix.LiveViewTest
+
+  alias LetItBid.Accounts
 
   describe "Settings page" do
     test "renders settings page", %{conn: conn} do

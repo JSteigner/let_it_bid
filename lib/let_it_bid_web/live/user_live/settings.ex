@@ -1,9 +1,16 @@
 defmodule LetItBidWeb.UserLive.Settings do
+  @moduledoc """
+  Account settings: change email (confirmed by link) and password.
+  Requires a recent login (sudo mode).
+  """
+
   use LetItBidWeb, :live_view
 
-  on_mount {LetItBidWeb.UserAuth, :require_sudo_mode}
+  require Logger
 
   alias LetItBid.Accounts
+
+  on_mount {LetItBidWeb.UserAuth, :require_sudo_mode}
 
   @impl true
   def render(assigns) do
@@ -116,19 +123,23 @@ defmodule LetItBidWeb.UserLive.Settings do
     user = socket.assigns.current_scope.user
     true = Accounts.sudo_mode?(user)
 
-    case Accounts.change_user_email(user, user_params) do
-      %{valid?: true} = changeset ->
-        Accounts.deliver_user_update_email_instructions(
-          Ecto.Changeset.apply_action!(changeset, :insert),
-          user.email,
-          &url(~p"/users/settings/confirm-email/#{&1}")
+    confirm_url = &url(~p"/users/settings/confirm-email/#{&1}")
+
+    case Accounts.request_email_change(user, user_params, confirm_url) do
+      {:ok, _email} ->
+        info = "A link to confirm your email change has been sent to the new address."
+        {:noreply, put_flash(socket, :info, info)}
+
+      {:error, {:delivery_failed, reason}} ->
+        Logger.error(
+          "Failed to send email change confirmation to user #{user.id}: #{inspect(reason)}"
         )
 
-        info = "A link to confirm your email change has been sent to the new address."
-        {:noreply, socket |> put_flash(:info, info)}
+        error = "We couldn't send the confirmation email. Please try again."
+        {:noreply, put_flash(socket, :error, error)}
 
-      changeset ->
-        {:noreply, assign(socket, :email_form, to_form(changeset, action: :insert))}
+      {:error, changeset} ->
+        {:noreply, assign(socket, :email_form, to_form(changeset))}
     end
   end
 

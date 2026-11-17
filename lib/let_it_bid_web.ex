@@ -17,8 +17,12 @@ defmodule LetItBidWeb do
   those modules here.
   """
 
+  @doc "Paths under `priv/static` served as static files and allowed in `~p`."
+  @spec static_paths() :: [String.t()]
   def static_paths, do: ~w(assets fonts images favicon.ico robots.txt)
 
+  @doc "Code injected by `use LetItBidWeb, :router`."
+  @spec router() :: Macro.t()
   def router do
     quote do
       use Phoenix.Router, helpers: false
@@ -30,12 +34,16 @@ defmodule LetItBidWeb do
     end
   end
 
+  @doc "Code injected by `use LetItBidWeb, :channel`."
+  @spec channel() :: Macro.t()
   def channel do
     quote do
       use Phoenix.Channel
     end
   end
 
+  @doc "Code injected by `use LetItBidWeb, :controller`."
+  @spec controller() :: Macro.t()
   def controller do
     quote do
       use Phoenix.Controller, formats: [:html, :json]
@@ -48,6 +56,8 @@ defmodule LetItBidWeb do
     end
   end
 
+  @doc "Code injected by `use LetItBidWeb, :live_view`."
+  @spec live_view() :: Macro.t()
   def live_view do
     quote do
       use Phoenix.LiveView
@@ -56,6 +66,8 @@ defmodule LetItBidWeb do
     end
   end
 
+  @doc "Code injected by `use LetItBidWeb, :live_component`."
+  @spec live_component() :: Macro.t()
   def live_component do
     quote do
       use Phoenix.LiveComponent
@@ -64,6 +76,8 @@ defmodule LetItBidWeb do
     end
   end
 
+  @doc "Code injected by `use LetItBidWeb, :html` (function components and HTML modules)."
+  @spec html() :: Macro.t()
   def html do
     quote do
       use Phoenix.Component
@@ -77,25 +91,8 @@ defmodule LetItBidWeb do
     end
   end
 
-  defp html_helpers do
-    quote do
-      # Translation
-      use Gettext, backend: LetItBidWeb.Gettext
-
-      # HTML escaping functionality
-      import Phoenix.HTML
-      # Core UI components
-      import LetItBidWeb.CoreComponents
-
-      # Common modules used in templates
-      alias Phoenix.LiveView.JS
-      alias LetItBidWeb.Layouts
-
-      # Routes generation with the ~p sigil
-      unquote(verified_routes())
-    end
-  end
-
+  @doc "Code injected by `use LetItBidWeb, :verified_routes`; enables the `~p` sigil."
+  @spec verified_routes() :: Macro.t()
   def verified_routes do
     quote do
       use Phoenix.VerifiedRoutes,
@@ -110,5 +107,25 @@ defmodule LetItBidWeb do
   """
   defmacro __using__(which) when is_atom(which) do
     apply(__MODULE__, which, [])
+  end
+
+  defp html_helpers do
+    quote do
+      # Translation
+      use Gettext, backend: LetItBidWeb.Gettext
+
+      # HTML escaping functionality
+      import Phoenix.HTML
+      # Core UI components
+      import LetItBidWeb.CoreComponents
+
+      # Common modules used in templates
+      alias Phoenix.LiveView.JS
+
+      alias LetItBidWeb.Layouts
+
+      # Routes generation with the ~p sigil
+      unquote(verified_routes())
+    end
   end
 end

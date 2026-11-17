@@ -1,8 +1,10 @@
 defmodule LetItBidWeb.UserLive.ConfirmationTest do
   use LetItBidWeb.ConnCase, async: true
 
-  import Phoenix.LiveViewTest
   import LetItBid.AccountsFixtures
+  import Phoenix.LiveViewTest
+
+  alias Phoenix.Flash
 
   alias LetItBid.Accounts
 
@@ -58,7 +60,7 @@ defmodule LetItBidWeb.UserLive.ConfirmationTest do
 
       conn = follow_trigger_action(form, conn)
 
-      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
+      assert Flash.get(conn.assigns.flash, :info) =~
                "User confirmed successfully"
 
       assert Accounts.get_user!(user.id).confirmed_at
@@ -70,8 +72,7 @@ defmodule LetItBidWeb.UserLive.ConfirmationTest do
       conn = build_conn()
 
       {:ok, _lv, html} =
-        live(conn, ~p"/users/log-in/#{token}")
-        |> follow_redirect(conn, ~p"/users/log-in")
+        follow_redirect(live(conn, ~p"/users/log-in/#{token}"), conn, ~p"/users/log-in")
 
       assert html =~ "Magic link is invalid or it has expired"
     end
@@ -92,7 +93,7 @@ defmodule LetItBidWeb.UserLive.ConfirmationTest do
 
       conn = follow_trigger_action(form, conn)
 
-      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
+      assert Flash.get(conn.assigns.flash, :info) =~
                "Welcome back!"
 
       assert Accounts.get_user!(user.id).confirmed_at == user.confirmed_at
@@ -101,16 +102,14 @@ defmodule LetItBidWeb.UserLive.ConfirmationTest do
       conn = build_conn()
 
       {:ok, _lv, html} =
-        live(conn, ~p"/users/log-in/#{token}")
-        |> follow_redirect(conn, ~p"/users/log-in")
+        follow_redirect(live(conn, ~p"/users/log-in/#{token}"), conn, ~p"/users/log-in")
 
       assert html =~ "Magic link is invalid or it has expired"
     end
 
     test "raises error for invalid token", %{conn: conn} do
       {:ok, _lv, html} =
-        live(conn, ~p"/users/log-in/invalid-token")
-        |> follow_redirect(conn, ~p"/users/log-in")
+        follow_redirect(live(conn, ~p"/users/log-in/invalid-token"), conn, ~p"/users/log-in")
 
       assert html =~ "Magic link is invalid or it has expired"
     end

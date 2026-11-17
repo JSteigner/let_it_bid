@@ -1,9 +1,11 @@
 defmodule LetItBid.AccountsTest do
   use LetItBid.DataCase
 
-  alias LetItBid.Accounts
-
   import LetItBid.AccountsFixtures
+
+  alias Ecto.Changeset
+
+  alias LetItBid.Accounts
   alias LetItBid.Accounts.{User, UserToken}
 
   describe "get_user_by_email/1" do
@@ -23,12 +25,12 @@ defmodule LetItBid.AccountsTest do
     end
 
     test "does not return the user if the password is not valid" do
-      user = user_fixture() |> set_password()
+      user = set_password(user_fixture())
       refute Accounts.get_user_by_email_and_password(user.email, "invalid")
     end
 
     test "returns the user if the email and password are valid" do
-      %{id: id} = user = user_fixture() |> set_password()
+      %{id: id} = user = set_password(user_fixture())
 
       assert %User{id: ^id} =
                Accounts.get_user_by_email_and_password(user.email, valid_user_password())
@@ -108,7 +110,7 @@ defmodule LetItBid.AccountsTest do
 
   describe "change_user_email/3" do
     test "returns a user changeset" do
-      assert %Ecto.Changeset{} = changeset = Accounts.change_user_email(%User{})
+      assert %Changeset{} = changeset = Accounts.change_user_email(%User{})
       assert changeset.required == [:email]
     end
   end
@@ -132,6 +134,48 @@ defmodule LetItBid.AccountsTest do
     end
   end
 
+  describe "request_email_change/3" do
+    setup do
+      %{user: user_fixture()}
+    end
+
+    test "emails a change link to the new address", %{user: user} do
+      new_email = unique_user_email()
+
+      token =
+        extract_user_token(fn url ->
+          Accounts.request_email_change(user, %{email: new_email}, url)
+        end)
+
+      {:ok, token} = Base.url_decode64(token, padding: false)
+      assert user_token = Repo.get_by(UserToken, token: :crypto.hash(:sha256, token))
+      assert user_token.user_id == user.id
+      assert user_token.sent_to == new_email
+      assert user_token.context == "change:#{user.email}"
+    end
+
+    test "doesn't change the email yet", %{user: user} do
+      assert {:ok, _email} =
+               Accounts.request_email_change(user, %{email: unique_user_email()}, & &1)
+
+      assert Accounts.get_user!(user.id).email == user.email
+    end
+
+    test "returns a changeset with the insert action for an invalid email", %{user: user} do
+      assert {:error, changeset} =
+               Accounts.request_email_change(user, %{email: "not valid"}, & &1)
+
+      assert changeset.action == :insert
+      assert "must have the @ sign and no spaces" in errors_on(changeset).email
+      refute Repo.get_by(UserToken, user_id: user.id, context: "change:#{user.email}")
+    end
+
+    test "returns a changeset when the email is unchanged", %{user: user} do
+      assert {:error, changeset} = Accounts.request_email_change(user, %{email: user.email}, & &1)
+      assert "did not change" in errors_on(changeset).email
+    end
+  end
+
   describe "update_user_email/2" do
     setup do
       user = unconfirmed_user_fixture()
@@ -151,6 +195,13 @@ defmodule LetItBid.AccountsTest do
       assert changed_user.email != user.email
       assert changed_user.email == email
       refute Repo.get_by(UserToken, user_id: user.id)
+    end
+
+    test "does not update email with a token that isn't valid base64", %{user: user} do
+      assert Accounts.update_user_email(user, "not base64!") ==
+               {:error, :transaction_aborted}
+
+      assert Repo.get!(User, user.id).email == user.email
     end
 
     test "does not update email with invalid token", %{user: user} do
@@ -182,7 +233,7 @@ defmodule LetItBid.AccountsTest do
 
   describe "change_user_password/3" do
     test "returns a user changeset" do
-      assert %Ecto.Changeset{} = changeset = Accounts.change_user_password(%User{})
+      assert %Changeset{} = changeset = Accounts.change_user_password(%User{})
       assert changeset.required == [:password]
     end
 

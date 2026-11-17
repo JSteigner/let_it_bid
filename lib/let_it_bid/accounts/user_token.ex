@@ -1,7 +1,18 @@
 defmodule LetItBid.Accounts.UserToken do
+  @moduledoc """
+  Session, magic-link and change-email tokens for users.
+
+  Session tokens are stored as-is; email tokens are stored hashed, so a
+  leaked database can't be used to log in through emailed links.
+  """
+
   use Ecto.Schema
+
   import Ecto.Query
-  alias LetItBid.Accounts.UserToken
+
+  alias Ecto.Query
+
+  alias LetItBid.Accounts.{User, UserToken}
 
   @hash_algorithm :sha256
   @rand_size 32
@@ -12,12 +23,23 @@ defmodule LetItBid.Accounts.UserToken do
   @change_email_validity_in_days 7
   @session_validity_in_days 14
 
+  @type t :: %__MODULE__{
+          id: integer() | nil,
+          token: binary() | nil,
+          context: String.t() | nil,
+          sent_to: String.t() | nil,
+          authenticated_at: DateTime.t() | nil,
+          user_id: integer() | nil,
+          user: User.t() | Ecto.Association.NotLoaded.t() | nil,
+          inserted_at: DateTime.t() | nil
+        }
+
   schema "users_tokens" do
     field :token, :binary
     field :context, :string
     field :sent_to, :string
     field :authenticated_at, :utc_datetime
-    belongs_to :user, LetItBid.Accounts.User
+    belongs_to :user, User
 
     timestamps(type: :utc_datetime, updated_at: false)
   end
@@ -41,6 +63,7 @@ defmodule LetItBid.Accounts.UserToken do
   and devices in the UI and allow users to explicitly expire any
   session they deem invalid.
   """
+  @spec build_session_token(User.t()) :: {binary(), t()}
   def build_session_token(user) do
     token = :crypto.strong_rand_bytes(@rand_size)
     dt = user.authenticated_at || DateTime.utc_now(:second)
@@ -55,6 +78,7 @@ defmodule LetItBid.Accounts.UserToken do
   The token is valid if it matches the value in the database and it has
   not expired (after @session_validity_in_days).
   """
+  @spec verify_session_token_query(binary()) :: {:ok, Query.t()}
   def verify_session_token_query(token) do
     query =
       from token in by_token_and_context_query(token, "session"),
@@ -78,21 +102,9 @@ defmodule LetItBid.Accounts.UserToken do
   Users can easily adapt the existing code to provide other types of delivery methods,
   for example, by phone numbers.
   """
+  @spec build_email_token(User.t(), String.t()) :: {String.t(), t()}
   def build_email_token(user, context) do
     build_hashed_token(user, context, user.email)
-  end
-
-  defp build_hashed_token(user, context, sent_to) do
-    token = :crypto.strong_rand_bytes(@rand_size)
-    hashed_token = :crypto.hash(@hash_algorithm, token)
-
-    {Base.url_encode64(token, padding: false),
-     %UserToken{
-       token: hashed_token,
-       context: context,
-       sent_to: sent_to,
-       user_id: user.id
-     }}
   end
 
   @doc """
@@ -104,6 +116,7 @@ defmodule LetItBid.Accounts.UserToken do
   database. This function also checks whether the token has expired. The context
   of a magic link token is always "login".
   """
+  @spec verify_magic_link_token_query(String.t()) :: {:ok, Query.t()} | :error
   def verify_magic_link_token_query(token) do
     case Base.url_decode64(token, padding: false) do
       {:ok, decoded_token} ->
@@ -134,6 +147,7 @@ defmodule LetItBid.Accounts.UserToken do
   database and if it has not expired (after @change_email_validity_in_days).
   The context must always start with "change:".
   """
+  @spec verify_change_email_token_query(String.t(), String.t()) :: {:ok, Query.t()} | :error
   def verify_change_email_token_query(token, "change:" <> _ = context) do
     case Base.url_decode64(token, padding: false) do
       {:ok, decoded_token} ->
@@ -148,6 +162,19 @@ defmodule LetItBid.Accounts.UserToken do
       :error ->
         :error
     end
+  end
+
+  defp build_hashed_token(user, context, sent_to) do
+    token = :crypto.strong_rand_bytes(@rand_size)
+    hashed_token = :crypto.hash(@hash_algorithm, token)
+
+    {Base.url_encode64(token, padding: false),
+     %UserToken{
+       token: hashed_token,
+       context: context,
+       sent_to: sent_to,
+       user_id: user.id
+     }}
   end
 
   defp by_token_and_context_query(token, context) do

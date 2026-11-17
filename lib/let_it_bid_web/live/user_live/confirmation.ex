@@ -1,4 +1,8 @@
 defmodule LetItBidWeb.UserLive.Confirmation do
+  @moduledoc """
+  Magic-link landing page. Confirms the account on first use and logs the user in.
+  """
+
   use LetItBidWeb, :live_view
 
   alias LetItBid.Accounts

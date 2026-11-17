@@ -11,7 +11,24 @@ defmodule LetItBid.MixProject do
       aliases: aliases(),
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader],
+      dialyzer: dialyzer(),
+      test_coverage: [tool: ExCoveralls],
+      name: "LetItBid",
+      docs: [main: "readme", extras: ["README.md"]]
+    ]
+  end
+
+  # PLTs are cached in priv/plts (git-ignored) so they're only built once.
+  defp dialyzer do
+    [
+      plt_local_path: "priv/plts",
+      plt_core_path: "priv/plts",
+      plt_add_apps: [:mix, :ex_unit],
+      flags: [:unmatched_returns, :error_handling],
+      # Known false positives; each entry in the file explains why it's there.
+      ignore_warnings: ".dialyzer_ignore.exs",
+      list_unused_filters: true
     ]
   end
 
@@ -27,7 +44,12 @@ defmodule LetItBid.MixProject do
 
   def cli do
     [
-      preferred_envs: [precommit: :test]
+      preferred_envs: [
+        precommit: :test,
+        coveralls: :test,
+        "coveralls.html": :test,
+        "coveralls.detail": :test
+      ]
     ]
   end
 
@@ -73,7 +95,12 @@ defmodule LetItBid.MixProject do
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.5"}
+      {:bandit, "~> 1.5"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.38", only: :dev, runtime: false},
+      {:excoveralls, "~> 0.18", only: :test},
+      {:faker, "~> 0.18", only: :test}
     ]
   end
 
@@ -96,7 +123,22 @@ defmodule LetItBid.MixProject do
         "esbuild let_it_bid --minify",
         "phx.digest"
       ],
-      precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+      precommit: [
+        "compile --warnings-as-errors",
+        "deps.unlock --unused",
+        # Fails on retired Hex packages and ones with security advisories.
+        # Run through cmd: hex.audit lives in the Hex archive, which an alias
+        # can't load as a task; cmd still stops the alias if it fails.
+        "cmd mix hex.audit",
+        "format",
+        "credo --strict",
+        "dialyzer",
+        "ecto.create --quiet",
+        "ecto.migrate --quiet",
+        # Last: a failing test doesn't stop the alias (mix test only sets the
+        # exit code at shutdown), so its result must be the final output.
+        "coveralls"
+      ]
     ]
   end
 end

@@ -1,5 +1,11 @@
 defmodule LetItBidWeb.UserLive.Login do
+  @moduledoc """
+  Log-in page: request a magic link by email, or log in with a password.
+  """
+
   use LetItBidWeb, :live_view
+
+  require Logger
 
   alias LetItBid.Accounts
 
@@ -113,12 +119,11 @@ defmodule LetItBidWeb.UserLive.Login do
 
   def handle_event("submit_magic", %{"user" => %{"email" => email}}, socket) do
     if user = Accounts.get_user_by_email(email) do
-      Accounts.deliver_login_instructions(
-        user,
-        &url(~p"/users/log-in/#{&1}")
-      )
+      send_login_instructions(user)
     end
 
+    # Same message whether or not the email exists or was sent, so the page
+    # never reveals which emails have accounts.
     info =
       "If your email is in our system, you will receive instructions for logging in shortly."
 
@@ -126,6 +131,16 @@ defmodule LetItBidWeb.UserLive.Login do
      socket
      |> put_flash(:info, info)
      |> push_navigate(to: ~p"/users/log-in")}
+  end
+
+  defp send_login_instructions(user) do
+    case Accounts.deliver_login_instructions(user, &url(~p"/users/log-in/#{&1}")) do
+      {:ok, _email} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.error("Failed to send login email to user #{user.id}: #{inspect(reason)}")
+    end
   end
 
   defp local_mail_adapter? do

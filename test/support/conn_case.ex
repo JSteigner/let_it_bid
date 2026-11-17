@@ -17,6 +17,13 @@ defmodule LetItBidWeb.ConnCase do
 
   use ExUnit.CaseTemplate
 
+  alias Phoenix.ConnTest
+  alias Plug.Conn
+
+  alias LetItBid.Accounts
+  alias LetItBid.Accounts.{Scope, User}
+  alias LetItBid.AccountsFixtures
+
   using do
     quote do
       # The default endpoint for testing
@@ -33,7 +40,7 @@ defmodule LetItBidWeb.ConnCase do
 
   setup tags do
     LetItBid.DataCase.setup_sandbox(tags)
-    {:ok, conn: Phoenix.ConnTest.build_conn()}
+    {:ok, conn: ConnTest.build_conn()}
   end
 
   @doc """
@@ -44,9 +51,14 @@ defmodule LetItBidWeb.ConnCase do
   It stores an updated connection and a registered user in the
   test context.
   """
+  @spec register_and_log_in_user(map()) :: %{
+          conn: Conn.t(),
+          user: User.t(),
+          scope: Scope.t()
+        }
   def register_and_log_in_user(%{conn: conn} = context) do
-    user = LetItBid.AccountsFixtures.user_fixture()
-    scope = LetItBid.Accounts.Scope.for_user(user)
+    user = AccountsFixtures.user_fixture()
+    scope = Scope.for_user(user)
 
     opts =
       context
@@ -61,19 +73,20 @@ defmodule LetItBidWeb.ConnCase do
 
   It returns an updated `conn`.
   """
+  @spec log_in_user(Conn.t(), User.t(), keyword()) :: Conn.t()
   def log_in_user(conn, user, opts \\ []) do
-    token = LetItBid.Accounts.generate_user_session_token(user)
+    token = Accounts.generate_user_session_token(user)
 
-    maybe_set_token_authenticated_at(token, opts[:token_authenticated_at])
+    _ = maybe_set_token_authenticated_at(token, opts[:token_authenticated_at])
 
     conn
-    |> Phoenix.ConnTest.init_test_session(%{})
-    |> Plug.Conn.put_session(:user_token, token)
+    |> ConnTest.init_test_session(%{})
+    |> Conn.put_session(:user_token, token)
   end
 
   defp maybe_set_token_authenticated_at(_token, nil), do: nil
 
   defp maybe_set_token_authenticated_at(token, authenticated_at) do
-    LetItBid.AccountsFixtures.override_token_authenticated_at(token, authenticated_at)
+    AccountsFixtures.override_token_authenticated_at(token, authenticated_at)
   end
 end

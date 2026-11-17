@@ -1,15 +1,55 @@
 defmodule LetItBidWeb.UserSessionController do
+  @moduledoc """
+  Creates and deletes login sessions. The LiveView login forms post here,
+  because cookies can only be written from a regular HTTP request.
+  """
+
   use LetItBidWeb, :controller
+
+  alias Plug.Conn
 
   alias LetItBid.Accounts
   alias LetItBidWeb.UserAuth
 
+  @doc """
+  Logs a user in, by magic-link token or by email and password.
+
+  `"_action" => "confirmed"` comes from the confirmation page and changes
+  the welcome message.
+  """
+  @spec create(Conn.t(), map()) :: Conn.t()
   def create(conn, %{"_action" => "confirmed"} = params) do
     create(conn, params, "User confirmed successfully.")
   end
 
   def create(conn, params) do
     create(conn, params, "Welcome back!")
+  end
+
+  @doc """
+  Sets a new password, logs out every other session, and logs the user
+  back in with a fresh session.
+  """
+  @spec update_password(Conn.t(), map()) :: Conn.t()
+  def update_password(conn, %{"user" => user_params} = params) do
+    user = conn.assigns.current_scope.user
+    true = Accounts.sudo_mode?(user)
+    {:ok, {_user, expired_tokens}} = Accounts.update_user_password(user, user_params)
+
+    # disconnect all existing LiveViews with old sessions
+    UserAuth.disconnect_sessions(expired_tokens)
+
+    conn
+    |> put_session(:user_return_to, ~p"/users/settings")
+    |> create(params, "Password updated successfully!")
+  end
+
+  @doc "Logs the user out."
+  @spec delete(Conn.t(), map()) :: Conn.t()
+  def delete(conn, _params) do
+    conn
+    |> put_flash(:info, "Logged out successfully.")
+    |> UserAuth.log_out_user()
   end
 
   # magic link login
@@ -44,24 +84,5 @@ defmodule LetItBidWeb.UserSessionController do
       |> put_flash(:email, String.slice(email, 0, 160))
       |> redirect(to: ~p"/users/log-in")
     end
-  end
-
-  def update_password(conn, %{"user" => user_params} = params) do
-    user = conn.assigns.current_scope.user
-    true = Accounts.sudo_mode?(user)
-    {:ok, {_user, expired_tokens}} = Accounts.update_user_password(user, user_params)
-
-    # disconnect all existing LiveViews with old sessions
-    UserAuth.disconnect_sessions(expired_tokens)
-
-    conn
-    |> put_session(:user_return_to, ~p"/users/settings")
-    |> create(params, "Password updated successfully!")
-  end
-
-  def delete(conn, _params) do
-    conn
-    |> put_flash(:info, "Logged out successfully.")
-    |> UserAuth.log_out_user()
   end
 end

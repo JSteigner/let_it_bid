@@ -43,8 +43,7 @@ defmodule LetItBidWeb.UserLive.RegistrationTest do
       form = form(lv, "#registration_form", user: valid_user_attributes(email: email))
 
       {:ok, _lv, html} =
-        render_submit(form)
-        |> follow_redirect(conn, ~p"/users/log-in")
+        follow_redirect(render_submit(form), conn, ~p"/users/log-in")
 
       assert html =~
                ~r/An email was sent to .*, please access it to confirm your account/

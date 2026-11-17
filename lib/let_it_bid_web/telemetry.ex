@@ -1,7 +1,14 @@
 defmodule LetItBidWeb.Telemetry do
+  @moduledoc """
+  Supervises telemetry pollers and defines the metrics shown in LiveDashboard.
+  """
+
   use Supervisor
+
   import Telemetry.Metrics
 
+  @doc "Starts the telemetry supervisor."
+  @spec start_link(term()) :: Supervisor.on_start()
   def start_link(arg) do
     Supervisor.start_link(__MODULE__, arg, name: __MODULE__)
   end
@@ -19,6 +26,8 @@ defmodule LetItBidWeb.Telemetry do
     Supervisor.init(children, strategy: :one_for_one)
   end
 
+  @doc "Metrics reported to LiveDashboard."
+  @spec metrics() :: [Telemetry.Metrics.t()]
   def metrics do
     [
       # Phoenix Metrics

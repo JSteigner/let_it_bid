@@ -1,4 +1,8 @@
 defmodule LetItBidWeb.UserLive.Registration do
+  @moduledoc """
+  Sign-up page. Registers a user by email and sends a magic link to confirm it.
+  """
+
   use LetItBidWeb, :live_view
 
   alias LetItBid.Accounts
@@ -72,18 +76,18 @@ defmodule LetItBidWeb.UserLive.Registration do
          )
          |> push_navigate(to: ~p"/users/log-in")}
 
-      {:error, %Ecto.Changeset{} = changeset} ->
+      {:error, changeset} ->
         {:noreply, assign_form(socket, changeset)}
     end
   end
 
   def handle_event("validate", %{"user" => user_params}, socket) do
     changeset = Accounts.change_user_email(%User{}, user_params, validate_unique: false)
-    {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
+    {:noreply, assign_form(socket, changeset, action: :validate)}
   end
 
-  defp assign_form(socket, %Ecto.Changeset{} = changeset) do
-    form = to_form(changeset, as: "user")
+  defp assign_form(socket, changeset, opts \\ []) do
+    form = to_form(changeset, Keyword.put(opts, :as, "user"))
     assign(socket, form: form)
   end
 end
