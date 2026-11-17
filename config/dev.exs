@@ -1,10 +1,12 @@
 import Config
 
-# Configure your database
+# Configure your database: a local Postgres 18 (Postgres.app or Homebrew)
+# or docker-compose.yml; override with DB_HOST, DB_PORT, DB_USER and DB_PASSWORD.
 config :let_it_bid, LetItBid.Repo,
-  username: "postgres",
-  password: "postgres",
-  hostname: "localhost",
+  username: System.get_env("DB_USER", "postgres"),
+  password: System.get_env("DB_PASSWORD", "postgres"),
+  hostname: System.get_env("DB_HOST", "localhost"),
+  port: String.to_integer(System.get_env("DB_PORT", "5432")),
   database: "let_it_bid_dev",
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
