@@ -31,6 +31,7 @@ Postgres 18 on port 5432 by default: a local install (Postgres.app here) or `doc
 - Every module has a `@moduledoc` (`@moduledoc false` only for internal modules that aren't part of the API).
 - Every public function has a `@doc` and a `@spec`, including `defdelegate`s. Credo's `Specs` check enforces specs (function components in `core_components.ex` and `layouts.ex` are exempt; they're documented with `attr`/`slot`).
 - `@impl true` callbacks need no `@doc` or `@spec`; the behaviour documents them.
+- Exception: `lib/let_it_bid_web.ex` (the `LetItBidWeb` module) doesn't need `@doc`s on its functions. They still need `@spec`s.
 - Every schema defines `@type t`. Enum fields get their own type, e.g. `Auction.status()`.
 - Specs are precise: `{:ok, Auction.t()} | {:error, Ecto.Changeset.t()}`, not `any()` or `term()` unless the value really is arbitrary.
 - Doc examples with `#{...}` use `@doc ~S"""` so they aren't interpolated.

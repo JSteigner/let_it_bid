@@ -17,11 +17,9 @@ defmodule LetItBidWeb do
   those modules here.
   """
 
-  @doc "Paths under `priv/static` served as static files and allowed in `~p`."
   @spec static_paths() :: [String.t()]
   def static_paths, do: ~w(assets fonts images favicon.ico robots.txt)
 
-  @doc "Code injected by `use LetItBidWeb, :router`."
   @spec router() :: Macro.t()
   def router do
     quote do
@@ -34,7 +32,6 @@ defmodule LetItBidWeb do
     end
   end
 
-  @doc "Code injected by `use LetItBidWeb, :channel`."
   @spec channel() :: Macro.t()
   def channel do
     quote do
@@ -42,7 +39,6 @@ defmodule LetItBidWeb do
     end
   end
 
-  @doc "Code injected by `use LetItBidWeb, :controller`."
   @spec controller() :: Macro.t()
   def controller do
     quote do
@@ -56,7 +52,6 @@ defmodule LetItBidWeb do
     end
   end
 
-  @doc "Code injected by `use LetItBidWeb, :live_view`."
   @spec live_view() :: Macro.t()
   def live_view do
     quote do
@@ -66,7 +61,6 @@ defmodule LetItBidWeb do
     end
   end
 
-  @doc "Code injected by `use LetItBidWeb, :live_component`."
   @spec live_component() :: Macro.t()
   def live_component do
     quote do
@@ -76,7 +70,6 @@ defmodule LetItBidWeb do
     end
   end
 
-  @doc "Code injected by `use LetItBidWeb, :html` (function components and HTML modules)."
   @spec html() :: Macro.t()
   def html do
     quote do
@@ -91,7 +84,6 @@ defmodule LetItBidWeb do
     end
   end
 
-  @doc "Code injected by `use LetItBidWeb, :verified_routes`; enables the `~p` sigil."
   @spec verified_routes() :: Macro.t()
   def verified_routes do
     quote do
