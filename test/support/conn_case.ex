@@ -34,6 +34,8 @@ defmodule LetItBidWeb.ConnCase do
       # Import conveniences for testing with connections
       import Plug.Conn
       import Phoenix.ConnTest
+      import Phoenix.LiveViewTest
+      import LetItBid.AccountsFixtures
       import LetItBidWeb.ConnCase
     end
   end

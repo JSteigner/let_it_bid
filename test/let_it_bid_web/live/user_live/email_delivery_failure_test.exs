@@ -4,8 +4,6 @@ defmodule LetItBidWeb.UserLive.EmailDeliveryFailureTest do
   use LetItBidWeb.ConnCase, async: false
 
   import ExUnit.CaptureLog, only: [with_log: 1]
-  import LetItBid.AccountsFixtures
-  import Phoenix.LiveViewTest
 
   alias LetItBid.FailingMailAdapter
   alias LetItBid.Mailer

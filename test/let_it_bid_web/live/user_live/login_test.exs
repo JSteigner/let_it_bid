@@ -1,9 +1,6 @@
 defmodule LetItBidWeb.UserLive.LoginTest do
   use LetItBidWeb.ConnCase, async: true
 
-  import Phoenix.LiveViewTest
-  import LetItBid.AccountsFixtures
-
   describe "login page" do
     test "renders login page", %{conn: conn} do
       {:ok, _lv, html} = live(conn, ~p"/users/log-in")

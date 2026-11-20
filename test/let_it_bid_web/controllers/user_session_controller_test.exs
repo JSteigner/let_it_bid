@@ -1,8 +1,6 @@
 defmodule LetItBidWeb.UserSessionControllerTest do
   use LetItBidWeb.ConnCase, async: true
 
-  import LetItBid.AccountsFixtures
-
   alias Phoenix.Flash
 
   alias LetItBid.Accounts

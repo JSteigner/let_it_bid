@@ -1,8 +1,6 @@
 defmodule LetItBidWeb.UserAuthTest do
   use LetItBidWeb.ConnCase, async: true
 
-  import LetItBid.AccountsFixtures
-
   alias Phoenix.LiveView
   alias Phoenix.Socket.Broadcast
 

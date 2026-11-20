@@ -1,9 +1,6 @@
 defmodule LetItBidWeb.UserLive.ConfirmationTest do
   use LetItBidWeb.ConnCase, async: true
 
-  import LetItBid.AccountsFixtures
-  import Phoenix.LiveViewTest
-
   alias Phoenix.Flash
 
   alias LetItBid.Accounts

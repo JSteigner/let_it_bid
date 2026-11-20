@@ -1,9 +1,6 @@
 defmodule LetItBidWeb.UserLive.RegistrationTest do
   use LetItBidWeb.ConnCase, async: true
 
-  import Phoenix.LiveViewTest
-  import LetItBid.AccountsFixtures
-
   describe "Registration page" do
     test "renders registration page", %{conn: conn} do
       {:ok, _lv, html} = live(conn, ~p"/users/register")

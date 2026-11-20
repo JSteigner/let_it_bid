@@ -3,8 +3,6 @@ defmodule LetItBidWeb.UserLive.LoginDevMailboxTest do
   # after the async ones and one at a time, so no other test sees the swap.
   use LetItBidWeb.ConnCase, async: false
 
-  import Phoenix.LiveViewTest
-
   alias LetItBid.Mailer
 
   setup do

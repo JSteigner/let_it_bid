@@ -1,8 +1,6 @@
 defmodule LetItBid.AccountsTest do
   use LetItBid.DataCase
 
-  import LetItBid.AccountsFixtures
-
   alias Ecto.Changeset
 
   alias LetItBid.Accounts

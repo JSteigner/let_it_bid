@@ -26,6 +26,7 @@ defmodule LetItBid.DataCase do
       import Ecto
       import Ecto.Changeset
       import Ecto.Query
+      import LetItBid.AccountsFixtures
       import LetItBid.DataCase
     end
   end
