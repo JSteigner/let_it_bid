@@ -1,4 +1,9 @@
 defmodule LetItBidWeb.Endpoint do
+  @moduledoc """
+  The HTTP and WebSocket entry point: static files, sessions, the LiveView
+  socket and the plug pipeline in front of the router.
+  """
+
   use Phoenix.Endpoint, otp_app: :let_it_bid
 
   # The session will be stored in the cookie and signed,
