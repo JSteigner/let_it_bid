@@ -311,14 +311,7 @@ defmodule LetItBid.Accounts do
     changeset = change_user_email(user, attrs)
 
     with {:ok, user_with_new_email} <- Changeset.apply_action(changeset, :insert) do
-      case deliver_user_update_email_instructions(
-             user_with_new_email,
-             user.email,
-             update_email_url_fun
-           ) do
-        {:ok, email} -> {:ok, email}
-        {:error, reason} -> {:error, {:delivery_failed, reason}}
-      end
+      send_email_change_link(user_with_new_email, user.email, update_email_url_fun)
     end
   end
 
@@ -355,5 +348,16 @@ defmodule LetItBid.Accounts do
         {:ok, {user, tokens_to_expire}}
       end
     end)
+  end
+
+  defp send_email_change_link(user_with_new_email, current_email, update_email_url_fun) do
+    case deliver_user_update_email_instructions(
+           user_with_new_email,
+           current_email,
+           update_email_url_fun
+         ) do
+      {:ok, email} -> {:ok, email}
+      {:error, reason} -> {:error, {:delivery_failed, reason}}
+    end
   end
 end
