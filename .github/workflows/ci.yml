@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MIX_ENV: test
+  # Keep in sync with .tool-versions
+  ELIXIR_VERSION: "1.20.4"
+  OTP_VERSION: "29.1.2"
+
+jobs:
+  precommit:
+    name: mix precommit
+    # Pinned, not ubuntu-latest: setup-beam downloads OTP builds made for a
+    # specific Ubuntu release, so a moving image can break CI overnight.
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+          otp-version: ${{ env.OTP_VERSION }}
+          version-type: strict
+
+      - name: Restore deps and build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: mix-${{ runner.os }}-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            mix-${{ runner.os }}-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-
+
+      - name: Restore Dialyzer PLTs
+        uses: actions/cache@v4
+        with:
+          path: priv/plts
+          key: plts-${{ runner.os }}-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            plts-${{ runner.os }}-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-
+
+      - run: mix deps.get
+
+      # mix precommit fixes these locally instead of failing; CI should fail.
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Check for unused deps in mix.lock
+        run: mix deps.unlock --check-unused
+
+      - name: mix precommit
+        run: mix precommit
