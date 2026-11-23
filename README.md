@@ -2,7 +2,7 @@
 
 A live auction house built with Elixir, Phoenix LiveView and OTP.
 
-Every open auction runs as its own supervised process. Bids are applied one at a time, everyone watching sees them instantly, and when an auction process crashes it comes back exactly where it was, because Postgres, not the process, holds the truth. The name is a nod to Erlang's "let it crash".
+Every open auction runs as its own supervised process. Bids are applied one at a time, everyone watching sees them instantly, and when an auction process crashes it comes back exactly where it was, because Postgres, not the process, holds the truth. The name is a nod to Erlang's "let it crash" and The Beatles "Let it Be".
 
 > **Status: work in progress.** The auction engine is done and tested: bidding rules, anti-sniping, one process per auction, crash recovery, and restart after a deploy. The LiveView pages (auction list, live auction room, viewer count, a "crash this auction" button) are next.
 
