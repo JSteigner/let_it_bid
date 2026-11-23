@@ -27,6 +27,14 @@ config :let_it_bid, LetItBidWeb.Endpoint,
 # In test we don't send emails
 config :let_it_bid, LetItBid.Mailer, adapter: Swoosh.Adapters.Test
 
+# Tests start auction servers themselves; Rehydrator.run/0 is tested directly
+config :let_it_bid, start_rehydrator: false
+
+# Short anti-snipe timing so auction tests finish in under a second or two
+config :let_it_bid, LetItBid.Auctions,
+  anti_snipe_window_ms: 500,
+  anti_snipe_extension_ms: 1_000
+
 # Disable swoosh api client as it is only required for production adapters
 config :swoosh, :api_client, false
 

@@ -36,6 +36,7 @@ defmodule LetItBidWeb.ConnCase do
       import Phoenix.ConnTest
       import Phoenix.LiveViewTest
       import LetItBid.AccountsFixtures
+      import LetItBid.AuctionsFixtures
       import LetItBidWeb.ConnCase
     end
   end

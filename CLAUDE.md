@@ -20,18 +20,19 @@ Postgres 18 on port 5432 by default: a local install (Postgres.app here) or `doc
 - Don't say something works until its tests pass and `mix precommit` exits 0.
 
 ## Test-driven development
-1. **Red:** write the test first. Run it and check it fails *for the right reason* (the assertion fails, not a typo or a broken fixture).
+1. **Red:** write the test first. Run it and check it fails *for the right reason*: an assertion against real code. `UndefinedFunctionError`, a compile error, a typo or a broken fixture don't count. For a new module or function, first add a stub with the real name, arity, `@spec` and `@doc` that returns a wrong but well-typed value (e.g. `def minimum_next_bid(_state), do: 0`), so the first failure is the assertion.
 2. **Green:** write the least code that makes it pass.
 3. **Refactor:** clean up with the tests green, then run `mix precommit`.
-- Every public function has a test. Pure modules (e.g. `Auctions.Rules`) also get doctests.
+- Every public function has a test, in a test file. No doctests, and no `iex>` examples in `@doc`s.
 - Every bug fix starts with a failing regression test.
+- A test that passes on its first run (e.g. one that pins down existing behavior) hasn't shown it can fail. Break the code it covers on purpose (flip a comparison, drop a call), watch the test fail on its assertion, then restore the code.
 - Test behavior through the public API (context functions, LiveView events), not private functions or process internals.
 
 ## Docs and types
 - Every module has a `@moduledoc` (`@moduledoc false` only for internal modules that aren't part of the API).
 - Every public function has a `@doc` and a `@spec`, including `defdelegate`s. Credo's `Specs` check enforces specs (function components in `core_components.ex` and `layouts.ex` are exempt; they're documented with `attr`/`slot`).
 - `@impl true` callbacks need no `@doc` or `@spec`; the behaviour documents them.
-- Exception: `lib/let_it_bid_web.ex` (the `LetItBidWeb` module) doesn't need `@doc`s on its functions. They still need `@spec`s.
+- Exception: `lib/let_it_bid_web.ex` (the `LetItBidWeb` module) doesn't need `@doc`s on its functions. They still need `@spec`s. It's also excluded from coverage (`coveralls.json`): its `quote` helpers run at compile time, so a test calling them can't fail without the app failing to compile first. Don't add tests for them.
 - Every schema defines `@type t`. Enum fields get their own type, e.g. `Auction.status()`.
 - Specs are precise: `{:ok, Auction.t()} | {:error, Ecto.Changeset.t()}`, not `any()` or `term()` unless the value really is arbitrary.
 - Doc examples with `#{...}` use `@doc ~S"""` so they aren't interpolated.
@@ -68,10 +69,11 @@ Postgres 18 on port 5432 by default: a local install (Postgres.app here) or `doc
 ## Tests
 - Test files mirror `lib/` (e.g. `test/let_it_bid/auctions/rules_test.exs`).
 - Data tests use `LetItBid.DataCase`; web tests use `LetItBidWeb.ConnCase`. Default to `async: true`.
-- Build data with the fixture modules in `test/support/fixtures/` (`AccountsFixtures`, `AuctionsFixtures`). Use literal values only when the exact value matters.
+- Build data with the fixture modules in `test/support/fixtures/` (`AccountsFixtures`, `AuctionsFixtures`). `DataCase` and `ConnCase` import both (and `ConnCase` imports `Phoenix.LiveViewTest`), so tests don't import them again. Use literal values only when the exact value matters.
 - Processes: `start_supervised!/1`. Wait for messages with `assert_receive`, never `Process.sleep`.
 - Tests that change global state (application env, a named process the app owns) use `async: false` and restore the state in `on_exit`.
-- Auction server tests are `async: false` (the restarted processes need the shared sandbox) and stop their servers in `on_exit` before the sandbox shuts down.
+- Auction server tests are `async: false` (the restarted processes need the shared sandbox) and stop their servers in `on_exit` (`stop_auction_servers/0`) before the sandbox shuts down.
+- Async tests never start an auction server: build data with `auction_fixture/1` and `bid_fixture/2` (direct inserts), never `live_auction_fixture/2`, `Auctions.create_auction/2` or `Auctions.place_bid/3`. A server started from an async test queries the database outside that test's sandbox and crashes.
 - LiveView tests assert with `has_element?/2`/`element/2` and the DOM IDs in the template, not raw HTML matching (see AGENTS.md).
 
 ## Conventions
@@ -85,6 +87,31 @@ Postgres 18 on port 5432 by default: a local install (Postgres.app here) or `doc
 Follow the [Elixir Style Guide](https://github.com/christopheradams/elixir_style_guide). `credo --strict` (in `mix precommit`, configured in `.credo.exs`) enforces most of it: pipes one step per line, no single-step pipes, pipes starting with a bare value, a `@moduledoc` on every module, a `@spec` on every public function, directive order (`@moduledoc`, `@behaviour`, `use`, `import`, `require`, `alias`), and aliases for nested modules called more than once. Fix what it reports rather than disabling checks.
 
 Credo can't check these, so follow them by hand:
+
+- No nested `case` (or `case` inside `with`/`if`). Move the inner one into a private function named for what it decides, e.g. `start_server_if_open/1`.
+- When a value passes through two or more nested calls, write a pipe chain that starts from the value instead, and keep adding steps to the chain rather than wrapping its result:
+  ```elixir
+  # not this
+  Process.exit(Server.whereis(auction.id), :kill)
+  Repo.insert!(struct!(Auction, Map.put(fields, :seller_id, seller.id)))
+
+  # this
+  auction.id
+  |> Server.whereis()
+  |> Process.exit(:kill)
+
+  attrs
+  |> valid_auction_attributes()
+  |> Map.put(:seller_id, seller.id)
+  |> then(&struct!(Auction, &1))
+  |> Repo.insert!()
+  ```
+  The rule covers a value flowing through each call's first argument (`f(g(x))`, `f(g(x), y)`). These stay as they are:
+  - An inner call in another argument position: `Phoenix.PubSub.subscribe(@pubsub, topic(auction_id))`.
+  - A builder called on literals, typically in tests: `Rules.validate_bid(state(top_bid_cents: 1_500), ...)`.
+  - A call wrapped around a call with no value argument, since its pipe would start with a function call: `DateTime.add(DateTime.utc_now(), 1, :hour)`.
+
+  Inside an existing chain, use `then/2` for a step that takes the value in another position (the `struct!/2` step above). If a later step needs the value again, bind it to a variable, or end the chain with a small helper that returns it (e.g. `wait_until_idle/1`).
 
 - Private functions (`defp`) go at the bottom of the module, after every public function, in tests too (after the last `test`/`describe`). Generated auth code predates this rule; don't reorder it unless you're already changing that module.
 - After the directives come module attributes, `defstruct`, then `@type`. Put a blank line between each group, including after the `@moduledoc`:

@@ -12,8 +12,13 @@ defmodule LetItBid.Application do
       LetItBid.Repo,
       {DNSCluster, query: Application.get_env(:let_it_bid, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: LetItBid.PubSub},
-      # Start a worker by calling: LetItBid.Worker.start_link(arg)
-      # {LetItBid.Worker, arg},
+      # Auction servers need Repo and PubSub; the Endpoint needs them running
+      # before it takes requests.
+      {Registry, keys: :unique, name: LetItBid.Auctions.Registry},
+      LetItBid.Auctions.ServerSupervisor,
+      # Needs the Registry and ServerSupervisor; runs before the Endpoint so
+      # open auctions have servers before requests arrive.
+      LetItBid.Auctions.Rehydrator,
       # Start to serve requests, typically the last entry
       LetItBidWeb.Endpoint
     ]
