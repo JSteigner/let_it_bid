@@ -24,6 +24,11 @@ config :let_it_bid,
   ecto_repos: [LetItBid.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+# Anti-sniping: a bid in the last `window` pushes the end to now + `extension`.
+config :let_it_bid, LetItBid.Auctions,
+  anti_snipe_window_ms: 10_000,
+  anti_snipe_extension_ms: 10_000
+
 # Configure the endpoint
 config :let_it_bid, LetItBidWeb.Endpoint,
   url: [host: "localhost"],
