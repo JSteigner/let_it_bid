@@ -48,6 +48,24 @@ defmodule LetItBid.AccountsTest do
     end
   end
 
+  describe "create_demo_user/0" do
+    test "creates a confirmed demo user with an undeliverable email" do
+      assert {:ok, %User{} = user} = Accounts.create_demo_user()
+
+      assert user.demo
+      assert user.confirmed_at
+      assert user.email =~ ~r/^demo-.+@demo\.letitbid\.invalid$/
+      assert Repo.get!(User, user.id).demo
+    end
+
+    test "gives every demo user a different email" do
+      {:ok, first} = Accounts.create_demo_user()
+      {:ok, second} = Accounts.create_demo_user()
+
+      refute first.email == second.email
+    end
+  end
+
   describe "register_user/1" do
     test "requires email to be set" do
       {:error, changeset} = Accounts.register_user(%{})

@@ -41,6 +41,9 @@ defmodule LetItBidWeb.UserLive.Registration do
             Create an account
           </.button>
         </.form>
+
+        <div class="divider">or</div>
+        <.demo_login_button />
       </div>
     </Layouts.app>
     """

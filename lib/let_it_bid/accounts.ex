@@ -87,6 +87,26 @@ defmodule LetItBid.Accounts do
     |> Repo.insert()
   end
 
+  @doc """
+  Creates a confirmed demo user with a random, undeliverable email
+  (`@demo.letitbid.invalid`), so a visitor can try the app without
+  waiting for a magic-link email. Demo users are cleaned up after a day.
+  """
+  @spec create_demo_user() :: {:ok, User.t()}
+  def create_demo_user do
+    name =
+      5
+      |> :crypto.strong_rand_bytes()
+      |> Base.encode16(case: :lower)
+
+    user =
+      %User{demo: true, confirmed_at: DateTime.utc_now(:second)}
+      |> User.email_changeset(%{email: "demo-#{name}@demo.letitbid.invalid"})
+      |> Repo.insert!()
+
+    {:ok, user}
+  end
+
   ## Settings
 
   @doc """

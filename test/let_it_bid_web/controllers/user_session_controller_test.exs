@@ -9,6 +9,18 @@ defmodule LetItBidWeb.UserSessionControllerTest do
     %{unconfirmed_user: unconfirmed_user_fixture(), user: user_fixture()}
   end
 
+  describe "POST /users/demo" do
+    test "logs in a new demo user", %{conn: conn} do
+      conn = post(conn, ~p"/users/demo")
+
+      assert token = get_session(conn, :user_token)
+      assert {user, _inserted_at} = Accounts.get_user_by_session_token(token)
+      assert user.demo
+      assert redirected_to(conn) == ~p"/"
+      assert Flash.get(conn.assigns.flash, :info) =~ "demo user"
+    end
+  end
+
   describe "POST /users/log-in - email and password" do
     test "logs the user in", %{conn: conn, user: user} do
       user = set_password(user)

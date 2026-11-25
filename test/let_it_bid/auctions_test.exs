@@ -25,6 +25,33 @@ defmodule LetItBid.AuctionsTest do
       assert [first.id, second.id] == [sooner.id, later.id]
       assert first.seller.email
     end
+
+    test "fills in each auction's top bid, or nil when nobody bid" do
+      with_bids = auction_fixture()
+      bid_fixture(with_bids, amount_cents: 1_000)
+      bid_fixture(with_bids, amount_cents: 1_500)
+      without_bids = auction_fixture()
+
+      listings = Map.new(Auctions.list_open_auctions(), &{&1.id, &1.top_bid_cents})
+
+      assert listings == %{with_bids.id => 1_500, without_bids.id => nil}
+    end
+  end
+
+  describe "get_listing!/1" do
+    test "returns the auction with its seller and top bid" do
+      auction = auction_fixture()
+      bid_fixture(auction, amount_cents: 1_200)
+
+      listing = Auctions.get_listing!(auction.id)
+
+      assert listing.top_bid_cents == 1_200
+      assert listing.seller.email
+    end
+
+    test "raises for an unknown auction" do
+      assert_raise Ecto.NoResultsError, fn -> Auctions.get_listing!(-1) end
+    end
   end
 
   describe "bid_history/1" do
@@ -50,6 +77,22 @@ defmodule LetItBid.AuctionsTest do
 
     test "topics are per auction" do
       refute Auctions.topic(1) == Auctions.topic(2)
+    end
+  end
+
+  describe "broadcast/2" do
+    test "reaches subscribers of that auction" do
+      :ok = Auctions.subscribe(42)
+      :ok = Auctions.broadcast(42, :hello)
+
+      assert_receive :hello
+    end
+
+    test "doesn't reach subscribers of a different auction" do
+      :ok = Auctions.subscribe(43)
+      :ok = Auctions.broadcast(42, :hello)
+
+      refute_receive :hello, 50
     end
   end
 

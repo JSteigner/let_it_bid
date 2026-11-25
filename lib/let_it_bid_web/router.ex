@@ -17,12 +17,6 @@ defmodule LetItBidWeb.Router do
     plug :fetch_current_scope_for_user
   end
 
-  scope "/", LetItBidWeb do
-    pipe_through :browser
-
-    get "/", PageController, :home
-  end
-
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:let_it_bid, :dev_routes) do
     # If you want to use the LiveDashboard in production, you should put
@@ -59,12 +53,14 @@ defmodule LetItBidWeb.Router do
 
     live_session :current_user,
       on_mount: [{LetItBidWeb.UserAuth, :mount_current_scope}] do
+      live "/", AuctionLive.Index, :index
       live "/users/register", UserLive.Registration, :new
       live "/users/log-in", UserLive.Login, :new
       live "/users/log-in/:token", UserLive.Confirmation, :new
     end
 
     post "/users/log-in", UserSessionController, :create
+    post "/users/demo", UserSessionController, :create_demo
     delete "/users/log-out", UserSessionController, :delete
   end
 end

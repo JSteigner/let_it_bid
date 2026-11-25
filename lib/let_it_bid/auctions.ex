@@ -12,12 +12,14 @@ defmodule LetItBid.Auctions do
   import Ecto.Query, warn: false
 
   alias Ecto.Changeset
+  alias Phoenix.PubSub
 
   alias LetItBid.Accounts.{Scope, User}
   alias LetItBid.Auctions.{Auction, Bid, Rules, Server, ServerSupervisor}
   alias LetItBid.Repo
 
   @pubsub LetItBid.PubSub
+  @all_auctions_topic "auctions"
 
   @type server_state :: %{
           id: integer(),
@@ -40,6 +42,7 @@ defmodule LetItBid.Auctions do
 
     with {:ok, auction} <- Repo.insert(changeset) do
       {:ok, _pid} = ServerSupervisor.start_server(auction.id)
+      :ok = broadcast(auction.id, {:auction_created, auction})
       {:ok, auction}
     end
   end
@@ -83,14 +86,27 @@ defmodule LetItBid.Auctions do
   def get_auction!(id), do: Repo.get!(Auction, id)
 
   @doc """
-  Lists open auctions, ending soonest first, with their sellers loaded.
+  Gets one auction as the auction list shows it: seller loaded and
+  `top_bid_cents` filled in. Raises `Ecto.NoResultsError` if it doesn't exist.
+  """
+  @spec get_listing!(integer()) :: Auction.t()
+  def get_listing!(id) do
+    Auction
+    |> where(id: ^id)
+    |> with_top_bid_and_seller()
+    |> Repo.one!()
+  end
+
+  @doc """
+  Lists open auctions, ending soonest first, with their sellers loaded and
+  `top_bid_cents` filled in (`nil` when nobody has bid).
   """
   @spec list_open_auctions() :: [Auction.t()]
   def list_open_auctions do
     Auction
     |> where(status: :open)
     |> order_by(asc: :ends_at)
-    |> preload(:seller)
+    |> with_top_bid_and_seller()
     |> Repo.all()
   end
 
@@ -117,7 +133,24 @@ defmodule LetItBid.Auctions do
   Subscribes the calling process to an auction's events (see `topic/1`).
   """
   @spec subscribe(integer()) :: :ok | {:error, term()}
-  def subscribe(auction_id), do: Phoenix.PubSub.subscribe(@pubsub, topic(auction_id))
+  def subscribe(auction_id), do: PubSub.subscribe(@pubsub, topic(auction_id))
+
+  @doc """
+  Subscribes the calling process to every auction's events, plus
+  `{:auction_created, auction}`. Used by pages that list auctions.
+  """
+  @spec subscribe_all() :: :ok | {:error, term()}
+  def subscribe_all, do: PubSub.subscribe(@pubsub, @all_auctions_topic)
+
+  @doc """
+  Broadcasts an auction event to the auction's own topic and to the
+  all-auctions topic (see `subscribe/1` and `subscribe_all/0`).
+  """
+  @spec broadcast(integer(), term()) :: :ok
+  def broadcast(auction_id, message) do
+    :ok = PubSub.broadcast(@pubsub, topic(auction_id), message)
+    :ok = PubSub.broadcast(@pubsub, @all_auctions_topic, message)
+  end
 
   @doc """
   Loads what an auction server needs to run: the auction's rules and the
@@ -197,6 +230,19 @@ defmodule LetItBid.Auctions do
       %Auction{status: :closed} -> {:error, :closed}
       %Auction{status: :open} -> ServerSupervisor.start_server(auction_id)
     end
+  end
+
+  defp with_top_bid_and_seller(query) do
+    top_bids =
+      from b in Bid,
+        group_by: b.auction_id,
+        select: %{auction_id: b.auction_id, amount_cents: max(b.amount_cents)}
+
+    from a in query,
+      left_join: t in subquery(top_bids),
+      on: t.auction_id == a.id,
+      preload: [:seller],
+      select_merge: %{top_bid_cents: t.amount_cents}
   end
 
   defp top_bid(auction_id) do

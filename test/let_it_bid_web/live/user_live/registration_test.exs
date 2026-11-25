@@ -1,6 +1,14 @@
 defmodule LetItBidWeb.UserLive.RegistrationTest do
   use LetItBidWeb.ConnCase, async: true
 
+  describe "demo user button" do
+    test "is on the registration page", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/register")
+
+      assert has_element?(lv, ~s|#demo-login-form[action="/users/demo"][method="post"]|)
+    end
+  end
+
   describe "Registration page" do
     test "renders registration page", %{conn: conn} do
       {:ok, _lv, html} = live(conn, ~p"/users/register")

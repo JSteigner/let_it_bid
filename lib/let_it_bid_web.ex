@@ -109,7 +109,9 @@ defmodule LetItBidWeb do
       # HTML escaping functionality
       import Phoenix.HTML
       # Core UI components
+      import LetItBidWeb.AuctionComponents
       import LetItBidWeb.CoreComponents
+      import LetItBidWeb.DemoComponents
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS
