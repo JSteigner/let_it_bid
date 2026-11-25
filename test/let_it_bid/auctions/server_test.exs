@@ -29,6 +29,23 @@ defmodule LetItBid.Auctions.ServerTest do
     end
   end
 
+  describe "subscribe_all/0" do
+    test "receives every auction's events, from creation to close",
+         %{seller: seller, bidder: bidder} do
+      :ok = Auctions.subscribe_all()
+
+      auction = live_auction_fixture(seller, ends_at: in_ms(300))
+      auction_id = auction.id
+      assert_receive {:auction_created, %Auction{id: ^auction_id}}
+
+      {:ok, bid} = Auctions.place_bid(bidder, auction.id, 1_000)
+      assert_receive {:bid_placed, ^bid}
+      assert_receive {:auction_extended, ^auction_id, _ends_at}
+
+      assert_receive {:auction_closed, %Auction{id: ^auction_id}}, extension_ms() + 1_000
+    end
+  end
+
   describe "place_bid/3" do
     test "saves an accepted bid and broadcasts it", %{seller: seller, bidder: bidder} do
       auction = live_auction_fixture(seller)

@@ -134,7 +134,5 @@ defmodule LetItBid.Auctions.Server do
 
   defp cancel_close_timer(_state), do: :ok
 
-  defp broadcast(state, message) do
-    :ok = Phoenix.PubSub.broadcast(LetItBid.PubSub, Auctions.topic(state.id), message)
-  end
+  defp broadcast(state, message), do: :ok = Auctions.broadcast(state.id, message)
 end

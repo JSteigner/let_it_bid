@@ -53,6 +53,22 @@ defmodule LetItBid.AuctionsTest do
     end
   end
 
+  describe "broadcast/2" do
+    test "reaches subscribers of that auction" do
+      :ok = Auctions.subscribe(42)
+      :ok = Auctions.broadcast(42, :hello)
+
+      assert_receive :hello
+    end
+
+    test "doesn't reach subscribers of a different auction" do
+      :ok = Auctions.subscribe(43)
+      :ok = Auctions.broadcast(42, :hello)
+
+      refute_receive :hello, 50
+    end
+  end
+
   describe "load_state/1" do
     test "returns the state the auction server needs" do
       auction = auction_fixture(starting_price_cents: 500, min_increment_cents: 50)

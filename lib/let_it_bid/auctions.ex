@@ -12,12 +12,14 @@ defmodule LetItBid.Auctions do
   import Ecto.Query, warn: false
 
   alias Ecto.Changeset
+  alias Phoenix.PubSub
 
   alias LetItBid.Accounts.{Scope, User}
   alias LetItBid.Auctions.{Auction, Bid, Rules, Server, ServerSupervisor}
   alias LetItBid.Repo
 
   @pubsub LetItBid.PubSub
+  @all_auctions_topic "auctions"
 
   @type server_state :: %{
           id: integer(),
@@ -40,6 +42,7 @@ defmodule LetItBid.Auctions do
 
     with {:ok, auction} <- Repo.insert(changeset) do
       {:ok, _pid} = ServerSupervisor.start_server(auction.id)
+      :ok = broadcast(auction.id, {:auction_created, auction})
       {:ok, auction}
     end
   end
@@ -117,7 +120,24 @@ defmodule LetItBid.Auctions do
   Subscribes the calling process to an auction's events (see `topic/1`).
   """
   @spec subscribe(integer()) :: :ok | {:error, term()}
-  def subscribe(auction_id), do: Phoenix.PubSub.subscribe(@pubsub, topic(auction_id))
+  def subscribe(auction_id), do: PubSub.subscribe(@pubsub, topic(auction_id))
+
+  @doc """
+  Subscribes the calling process to every auction's events, plus
+  `{:auction_created, auction}`. Used by pages that list auctions.
+  """
+  @spec subscribe_all() :: :ok | {:error, term()}
+  def subscribe_all, do: PubSub.subscribe(@pubsub, @all_auctions_topic)
+
+  @doc """
+  Broadcasts an auction event to the auction's own topic and to the
+  all-auctions topic (see `subscribe/1` and `subscribe_all/0`).
+  """
+  @spec broadcast(integer(), term()) :: :ok
+  def broadcast(auction_id, message) do
+    :ok = PubSub.broadcast(@pubsub, topic(auction_id), message)
+    :ok = PubSub.broadcast(@pubsub, @all_auctions_topic, message)
+  end
 
   @doc """
   Loads what an auction server needs to run: the auction's rules and the
