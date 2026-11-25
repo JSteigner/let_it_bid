@@ -16,6 +16,7 @@ defmodule LetItBid.Accounts.User do
           hashed_password: String.t() | nil,
           confirmed_at: DateTime.t() | nil,
           authenticated_at: DateTime.t() | nil,
+          demo: boolean(),
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -26,6 +27,7 @@ defmodule LetItBid.Accounts.User do
     field :hashed_password, :string, redact: true
     field :confirmed_at, :utc_datetime
     field :authenticated_at, :utc_datetime, virtual: true
+    field :demo, :boolean, default: false
 
     timestamps(type: :utc_datetime)
   end

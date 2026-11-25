@@ -27,6 +27,19 @@ defmodule LetItBidWeb.UserSessionController do
   end
 
   @doc """
+  Creates a fresh demo user and logs them in, so a visitor can try the app
+  without a magic-link email.
+  """
+  @spec create_demo(Conn.t(), map()) :: Conn.t()
+  def create_demo(conn, _params) do
+    {:ok, user} = Accounts.create_demo_user()
+
+    conn
+    |> put_flash(:info, "You're exploring as a demo user.")
+    |> UserAuth.log_in_user(user)
+  end
+
+  @doc """
   Sets a new password, logs out every other session, and logs the user
   back in with a fresh session.
   """

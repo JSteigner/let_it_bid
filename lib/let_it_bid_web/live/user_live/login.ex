@@ -31,6 +31,11 @@ defmodule LetItBidWeb.UserLive.Login do
           </.header>
         </div>
 
+        <div :if={!@current_scope}>
+          <.demo_login_button />
+          <div class="divider">or log in</div>
+        </div>
+
         <div :if={local_mail_adapter?()} class="alert alert-info">
           <.icon name="hero-information-circle" class="size-6 shrink-0" />
           <div>

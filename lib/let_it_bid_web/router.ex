@@ -65,6 +65,7 @@ defmodule LetItBidWeb.Router do
     end
 
     post "/users/log-in", UserSessionController, :create
+    post "/users/demo", UserSessionController, :create_demo
     delete "/users/log-out", UserSessionController, :delete
   end
 end
