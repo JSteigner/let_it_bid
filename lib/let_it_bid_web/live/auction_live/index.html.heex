@@ -1,0 +1,17 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <.header>
+    Live auctions
+    <:subtitle>Every bid shows up for everyone watching, the moment it's placed.</:subtitle>
+  </.header>
+
+  <div :if={!@current_scope} class="mb-8 max-w-xs">
+    <.demo_login_button />
+  </div>
+
+  <div id="auctions" phx-update="stream" class="divide-y divide-base-300">
+    <p id="auctions-empty" class="hidden only:block py-12 text-center text-base-content/60">
+      No open auctions right now.
+    </p>
+    <.auction_row :for={{id, auction} <- @streams.auctions} id={id} auction={auction} />
+  </div>
+</Layouts.app>
