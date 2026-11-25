@@ -36,6 +36,7 @@ defmodule LetItBid.Auctions.Auction do
           winning_bid_id: integer() | nil,
           winning_bid: Bid.t() | Ecto.Association.NotLoaded.t() | nil,
           bids: [Bid.t()] | Ecto.Association.NotLoaded.t(),
+          top_bid_cents: pos_integer() | nil,
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -47,6 +48,7 @@ defmodule LetItBid.Auctions.Auction do
     field :min_increment_cents, :integer
     field :ends_at, :utc_datetime_usec
     field :status, Ecto.Enum, values: @statuses, default: :open
+    field :top_bid_cents, :integer, virtual: true
 
     belongs_to :seller, User
     belongs_to :winning_bid, Bid

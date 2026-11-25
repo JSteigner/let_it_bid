@@ -86,14 +86,27 @@ defmodule LetItBid.Auctions do
   def get_auction!(id), do: Repo.get!(Auction, id)
 
   @doc """
-  Lists open auctions, ending soonest first, with their sellers loaded.
+  Gets one auction as the auction list shows it: seller loaded and
+  `top_bid_cents` filled in. Raises `Ecto.NoResultsError` if it doesn't exist.
+  """
+  @spec get_listing!(integer()) :: Auction.t()
+  def get_listing!(id) do
+    Auction
+    |> where(id: ^id)
+    |> with_top_bid_and_seller()
+    |> Repo.one!()
+  end
+
+  @doc """
+  Lists open auctions, ending soonest first, with their sellers loaded and
+  `top_bid_cents` filled in (`nil` when nobody has bid).
   """
   @spec list_open_auctions() :: [Auction.t()]
   def list_open_auctions do
     Auction
     |> where(status: :open)
     |> order_by(asc: :ends_at)
-    |> preload(:seller)
+    |> with_top_bid_and_seller()
     |> Repo.all()
   end
 
@@ -217,6 +230,19 @@ defmodule LetItBid.Auctions do
       %Auction{status: :closed} -> {:error, :closed}
       %Auction{status: :open} -> ServerSupervisor.start_server(auction_id)
     end
+  end
+
+  defp with_top_bid_and_seller(query) do
+    top_bids =
+      from b in Bid,
+        group_by: b.auction_id,
+        select: %{auction_id: b.auction_id, amount_cents: max(b.amount_cents)}
+
+    from a in query,
+      left_join: t in subquery(top_bids),
+      on: t.auction_id == a.id,
+      preload: [:seller],
+      select_merge: %{top_bid_cents: t.amount_cents}
   end
 
   defp top_bid(auction_id) do
